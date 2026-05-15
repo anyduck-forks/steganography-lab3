@@ -19,17 +19,20 @@ export function caesar(text: string, shift: number): string {
     function shiftCharacter(character: string, alphabet: string): string {
         const index = alphabet.indexOf(character);
         if (index === -1) return character;
-        return alphabet[(index + shift) % alphabet.length];
+        const normalizedShift = ((shift % alphabet.length) + alphabet.length) % alphabet.length;
+        return alphabet[(index + normalizedShift) % alphabet.length];
     }
 
     return text.replace(/./g, (character) => {
         const lower = character.toLowerCase();
         const isLower = character === lower;
-        const shiftedEnglish = shiftCharacter(lower, ALPHABET_EN);
-        const shiftedUkrainian = shiftCharacter(lower, ALPHABET_UA);
-        const shifted = shiftedEnglish !== lower ? shiftedEnglish : shiftedUkrainian;
 
-        return isLower ? shifted : shifted.toUpperCase();
+        if (ALPHABET_EN.includes(lower))
+            character = shiftCharacter(lower, ALPHABET_EN);
+        if (ALPHABET_UA.includes(lower))
+            character = shiftCharacter(lower, ALPHABET_UA);
+
+        return isLower ? character : character.toUpperCase();
     });
 }
 
@@ -156,7 +159,7 @@ export class ZeroWidthStegoMethod implements TextStegoMethod {
     }
 }
 
-const CHARACTER_REGEX = /[A-Za-zА-Яа-яІіЇї]/;
+const CHARACTER_REGEX = /[A-Za-zА-Яа-яІіЇїЩщ]/;
 
 export class CaseStegoMethod implements TextStegoMethod {
     capacity(cover: string): number {
@@ -194,6 +197,9 @@ export class CaseStegoMethod implements TextStegoMethod {
     }
 }
 
+const SS0 = " ";
+const SS1 = "  ";
+
 export class SpacesStegoMethod implements TextStegoMethod {
     capacity(cover: string): number {
         return cover.trim().length === 0 ? 0 : cover.trim().split(/\s+/).length - 1;
@@ -211,7 +217,7 @@ export class SpacesStegoMethod implements TextStegoMethod {
         const separatorIndices = tokens.map((_, index) => index).filter((index) => index % 2 === 1);
 
         for (let index = 0; index < bits.length; index++) {
-            tokens[separatorIndices[index]] = bits[index] === "1" ? "  " : " ";
+            tokens[separatorIndices[index]] = bits[index] === "1" ? SS1 : SS0;
         }
 
         return tokens.join("");
@@ -220,14 +226,14 @@ export class SpacesStegoMethod implements TextStegoMethod {
     decode(stego: string): string {
         const tokens = stego.split(/(\s+)/);
         const separatorIndices = tokens.map((_, index) => index).filter((index) => index % 2 === 1);
-        const bits = separatorIndices.map((index) => tokens[index].length > 1 ? "1" : "0").join("");
+        const bits = separatorIndices.map((index) => tokens[index] === SS1 ? "1" : "0").join("");
 
         return bitsToText(bits);
     }
 }
 
 const RGB0 = "#000000";
-const RGB1 = "#ff0000";
+const RGB1 = "#0A0A0A";
 
 export class ColorStegoMethod implements TextStegoMethod {
     capacity(cover: string): number {
