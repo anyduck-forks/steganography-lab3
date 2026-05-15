@@ -36,7 +36,7 @@ export function caesar(text: string, shift: number): string {
     });
 }
 
-function textToBits(text: string): string {
+export function textToBits(text: string): string {
     const bytes = Array.from(new TextEncoder().encode(text));
     const length = bytes.length;
     const lengthBits = Array.from({ length: 32 }, (_, index) => ((length >> (31 - index)) & 1) ? "1" : "0").join("");

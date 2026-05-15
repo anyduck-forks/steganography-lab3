@@ -7,6 +7,7 @@
         importDocxAsHtml,
         importDocxAsText,
         caesar,
+        textToBits,
     } from "$lib/text-stego";
     import type { TextMethod } from "$lib/text-stego";
 
@@ -32,11 +33,6 @@
         new TextEncoder().encode(secretText).length * 8 + 32,
     );
 
-    function bitsForText(text: string): string {
-        return Array.from(new TextEncoder().encode(text))
-            .map((byte) => byte.toString(2).padStart(8, "0"))
-            .join("");
-    }
 
     function clearDownload() {
         if (downloadUrl) {
@@ -155,7 +151,7 @@
             encodedText = String(await stegoMethod.encode(inputText, payload));
             stegoText = encodedText;
             encodedSecret = payload;
-            encodedSecretBits = bitsForText(payload);
+            encodedSecretBits = textToBits(payload);
         } catch (error: any) {
             textError = error?.message || "Encoding failed.";
         }
@@ -177,7 +173,7 @@
         try {
             const extractedText = String(await stegoMethod.decode(sourceText));
             decodedText = extractedText;
-            decodedBits = bitsForText(extractedText);
+            decodedBits = textToBits(extractedText);
             decodedTextAfterCaesar = useCaesar
                 ? caesar(extractedText, -caesarShift)
                 : extractedText;
