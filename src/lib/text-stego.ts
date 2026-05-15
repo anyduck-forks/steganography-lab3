@@ -113,7 +113,7 @@ export async function createHtmlDocxBlob(html: string) {
 
             const element = node as HTMLElement;
             if (element.tagName.toLowerCase() === "span" && element.style.color) {
-                const color = element.style.color.replace(/[^0-9a-fA-F]/g, "").slice(-6);
+                const color = colorToHex(element.style.color.toLowerCase()) || "#000000";
                 runs.push(new TextRun({ text: element.textContent || "", color }));
                 return;
             }
@@ -235,6 +235,20 @@ export class SpacesStegoMethod implements TextStegoMethod {
 const RGB0 = "#000000";
 const RGB1 = "#0A0A0A";
 
+function colorToHex(color: string) {
+  const nums = color.match(/\d+/g); // extract numbers
+  if (!nums) return null;
+
+  const [r, g, b] = nums;
+
+  return (
+    "#" +
+    [r, g, b]
+      .map(x => Number(x).toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
 export class ColorStegoMethod implements TextStegoMethod {
     capacity(cover: string): number {
         return cover.length;
@@ -251,7 +265,7 @@ export class ColorStegoMethod implements TextStegoMethod {
         const escaped = Array.from(cover).map((character) => escapeHtml(character));
         for (let index = 0; index < bits.length; index++) {
             const color = bits[index] === "1" ? RGB1 : RGB0;
-            escaped[index] = `<span style=\"color:${color}\">${escaped[index]}</span>`;
+            escaped[index] = `<span style=\"color:${color};\">${escaped[index]}</span>`;
         }
 
         return escaped.join("");
@@ -272,10 +286,12 @@ export class ColorStegoMethod implements TextStegoMethod {
 
             const element = node as HTMLElement;
             if (element.tagName.toLowerCase() === "span" && element.style.color) {
-                const color = element.style.color.toLowerCase();
-                const bit = color.includes(RGB1) ? "1" : "0";
-                for (const child of Array.from(node.childNodes)) walk(child, bit);
-                return;
+                const color = colorToHex(element.style.color.toLowerCase());
+                if (color) {
+                    const bit = color.includes(RGB1) ? "1" : "0";
+                    for (const child of Array.from(node.childNodes)) walk(child, bit);
+                    return;
+                }
             }
 
             for (const child of Array.from(node.childNodes)) walk(child, inheritedBit);
@@ -286,6 +302,8 @@ export class ColorStegoMethod implements TextStegoMethod {
         return bitsToText(bits.join(""));
     }
 }
+
+
 
 export const textStegoMethods: Record<TextMethod, TextStegoMethod> = {
     "zero-width": new ZeroWidthStegoMethod(),
