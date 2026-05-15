@@ -25,6 +25,7 @@
     let capacity = $state<number>(0);
     let downloadUrl = $state<string>("");
     let downloadName = $state<string>("");
+    let isGeneratingDocx = $state<boolean>(false);
 
     const requiredBits = $derived(
         new TextEncoder().encode(secretText).length * 8 + 32,
@@ -44,16 +45,33 @@
         downloadName = "";
     }
 
-    async function setDownloadFromOutput(output: string) {
-        clearDownload();
+    async function generateDownloadBlob() {
+        if (!encodedText) {
+            textError = "Encode a message first before downloading.";
+            return;
+        }
 
-        const blob =
-            method === "color"
-                ? await createHtmlDocxBlob(output)
-                : await createTextDocxBlob(output);
+        isGeneratingDocx = true;
+        try {
+            const blob =
+                method === "color"
+                    ? await createHtmlDocxBlob(encodedText)
+                    : await createTextDocxBlob(encodedText);
 
-        downloadUrl = URL.createObjectURL(blob);
-        downloadName = `stego-${method}.docx`;
+            clearDownload();
+            downloadUrl = URL.createObjectURL(blob);
+            downloadName = `stego-${method}.docx`;
+
+            // Trigger download immediately
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            link.download = downloadName;
+            link.click();
+        } catch (error: any) {
+            textError = error?.message || "Failed to generate DOCX.";
+        } finally {
+            isGeneratingDocx = false;
+        }
     }
 
     $effect(() => {
@@ -135,7 +153,6 @@
             encodedText = String(await stegoMethod.encode(inputText, payload));
             encodedSecret = payload;
             encodedSecretBits = bitsForText(payload);
-            await setDownloadFromOutput(encodedText);
         } catch (error: any) {
             textError = error?.message || "Encoding failed.";
         }
@@ -273,15 +290,12 @@
         </label>
 
         <div class="download-row">
-            <a
-                role="button"
-                href={downloadUrl || undefined}
-                download={downloadName}
-                aria-disabled={!downloadUrl}
-                class:disabled={!downloadUrl}
+            <button
+                onclick={generateDownloadBlob}
+                disabled={!encodedText || isGeneratingDocx}
             >
-                Download DOCX
-            </a>
+                {isGeneratingDocx ? "Generating..." : "Download DOCX"}
+            </button>
         </div>
 
         <label>

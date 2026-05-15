@@ -19,9 +19,7 @@ export function caesar(text: string, shift: number): string {
     function shiftCharacter(character: string, alphabet: string): string {
         const index = alphabet.indexOf(character);
         if (index === -1) return character;
-
-        const normalizedShift = ((shift % alphabet.length) + alphabet.length) % alphabet.length;
-        return alphabet[(index + normalizedShift) % alphabet.length];
+        return alphabet[(index + shift) % alphabet.length];
     }
 
     return text.replace(/./g, (character) => {
@@ -97,32 +95,37 @@ export async function createTextDocxBlob(text: string) {
 
 export async function createHtmlDocxBlob(html: string) {
     const container = document.createElement("div");
-    container.innerHTML = html;
-    const runs: TextRun[] = [];
+    try {
+        container.innerHTML = html;
+        const runs: TextRun[] = [];
 
-    const walk = (node: Node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent || "";
-            if (text) runs.push(new TextRun({ text }));
-            return;
-        }
+        const walk = (node: Node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                const text = node.textContent || "";
+                if (text) runs.push(new TextRun({ text }));
+                return;
+            }
 
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
+            if (node.nodeType !== Node.ELEMENT_NODE) return;
 
-        const element = node as HTMLElement;
-        if (element.tagName.toLowerCase() === "span" && element.style.color) {
-            const color = element.style.color.replace(/[^0-9a-fA-F]/g, "").slice(-6);
-            runs.push(new TextRun({ text: element.textContent || "", color }));
-            return;
-        }
+            const element = node as HTMLElement;
+            if (element.tagName.toLowerCase() === "span" && element.style.color) {
+                const color = element.style.color.replace(/[^0-9a-fA-F]/g, "").slice(-6);
+                runs.push(new TextRun({ text: element.textContent || "", color }));
+                return;
+            }
 
-        for (const child of Array.from(node.childNodes)) walk(child);
-    };
+            for (const child of Array.from(node.childNodes)) walk(child);
+        };
 
-    walk(container);
+        walk(container);
 
-    const doc = new Document({ sections: [{ children: [new Paragraph({ children: runs })] }] });
-    return Packer.toBlob(doc);
+        const doc = new Document({ sections: [{ children: [new Paragraph({ children: runs })] }] });
+        return Packer.toBlob(doc);
+    } finally {
+        // Cleanup to prevent memory leaks
+        container.innerHTML = "";
+    }
 }
 
 
@@ -153,9 +156,11 @@ export class ZeroWidthStegoMethod implements TextStegoMethod {
     }
 }
 
+const CHARACTER_REGEX = /[A-Za-zА-Яа-яІіЇї]/;
+
 export class CaseStegoMethod implements TextStegoMethod {
     capacity(cover: string): number {
-        return Array.from(cover).filter((character) => /[A-Za-z]/.test(character)).length;
+        return Array.from(cover).filter((character) => CHARACTER_REGEX.test(character)).length;
     }
 
     encode(cover: string, secret: string): string {
@@ -169,7 +174,7 @@ export class CaseStegoMethod implements TextStegoMethod {
 
         let bitIndex = 0;
         for (let index = 0; index < characters.length && bitIndex < bits.length; index++) {
-            if (!/[A-Za-z]/.test(characters[index])) continue;
+            if (!CHARACTER_REGEX.test(characters[index])) continue;
             characters[index] = bits[bitIndex] === "1" ? characters[index].toUpperCase() : characters[index].toLowerCase();
             bitIndex++;
         }
@@ -180,7 +185,7 @@ export class CaseStegoMethod implements TextStegoMethod {
     decode(stego: string): string {
         const bits: string[] = [];
         for (const character of stego) {
-            if (/[A-Za-z]/.test(character)) {
+            if (CHARACTER_REGEX.test(character)) {
                 bits.push(character === character.toUpperCase() ? "1" : "0");
             }
         }
@@ -221,6 +226,9 @@ export class SpacesStegoMethod implements TextStegoMethod {
     }
 }
 
+const RGB0 = "#000000";
+const RGB1 = "#ff0000";
+
 export class ColorStegoMethod implements TextStegoMethod {
     capacity(cover: string): number {
         return cover.length;
@@ -236,8 +244,8 @@ export class ColorStegoMethod implements TextStegoMethod {
 
         const escaped = Array.from(cover).map((character) => escapeHtml(character));
         for (let index = 0; index < bits.length; index++) {
-            const color = bits[index] === "1" ? "ff0000" : "000000";
-            escaped[index] = `<span style=\"color:#${color}\">${escaped[index]}</span>`;
+            const color = bits[index] === "1" ? RGB1 : RGB0;
+            escaped[index] = `<span style=\"color:${color}\">${escaped[index]}</span>`;
         }
 
         return escaped.join("");
@@ -258,8 +266,8 @@ export class ColorStegoMethod implements TextStegoMethod {
 
             const element = node as HTMLElement;
             if (element.tagName.toLowerCase() === "span" && element.style.color) {
-                const color = element.style.color.replace(/[^0-9a-fA-F]/g, "").slice(-6).toLowerCase();
-                const bit = color.includes("ff0000") ? "1" : "0";
+                const color = element.style.color.toLowerCase();
+                const bit = color.includes(RGB1) ? "1" : "0";
                 for (const child of Array.from(node.childNodes)) walk(child, bit);
                 return;
             }
