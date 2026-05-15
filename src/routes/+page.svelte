@@ -18,6 +18,7 @@
     let decodedBits = $state<string>("");
     let decodedText = $state<string>("");
     let decodedTextAfterCaesar = $state<string>("");
+    let stegoText = $state<string>("");
     let textError = $state<string>("");
     let method = $state<TextMethod>("zero-width");
     let useCaesar = $state<boolean>(false);
@@ -121,6 +122,7 @@
                     : isDocx
                       ? await importDocxAsText(file)
                       : await file.text();
+            stegoText = inputText;
         } catch (error: any) {
             textError = error?.message || "Could not read the file.";
         }
@@ -151,6 +153,7 @@
 
         try {
             encodedText = String(await stegoMethod.encode(inputText, payload));
+            stegoText = encodedText;
             encodedSecret = payload;
             encodedSecretBits = bitsForText(payload);
         } catch (error: any) {
@@ -158,13 +161,13 @@
         }
     }
 
-    async function handleDecode() {
+    async function handleDecode(sourceText = inputText) {
         textError = "";
         decodedBits = "";
         decodedText = "";
         decodedTextAfterCaesar = "";
 
-        if (!inputText.trim()) {
+        if (!sourceText.trim()) {
             textError = "Paste or drop stegotext first.";
             return;
         }
@@ -172,7 +175,7 @@
         const stegoMethod = getTextStegoMethod(method);
 
         try {
-            const extractedText = String(await stegoMethod.decode(inputText));
+            const extractedText = String(await stegoMethod.decode(sourceText));
             decodedText = extractedText;
             decodedBits = bitsForText(extractedText);
             decodedTextAfterCaesar = useCaesar
@@ -185,17 +188,20 @@
 
     $effect(() => {
         // reference Caesar settings so the effect re-runs when they change
+        void method;
         void useCaesar;
         void caesarShift;
 
-        if (!inputText.trim()) {
+        const sourceText = method === "color" ? stegoText || inputText : inputText;
+
+        if (!sourceText.trim()) {
             decodedBits = "";
             decodedText = "";
             decodedTextAfterCaesar = "";
             return;
         }
 
-        void handleDecode();
+        void handleDecode(sourceText);
     });
 
     $effect(() => {
@@ -235,6 +241,9 @@
             placeholder="Drop a DOCX file"
             ondrop={handleInputDrop}
             ondragover={handleInputDragOver}
+            oninput={() => {
+                stegoText = "";
+            }}
         ></textarea>
     </label>
 
@@ -365,8 +374,4 @@
         margin: 0;
     }
 
-    a.disabled {
-        pointer-events: none;
-        opacity: 0.5;
-    }
 </style>

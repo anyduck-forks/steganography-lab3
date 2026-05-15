@@ -233,7 +233,7 @@ export class SpacesStegoMethod implements TextStegoMethod {
 }
 
 const RGB0 = "#000000";
-const RGB1 = "#0A0A0A";
+const RGB1 = "#0a0a0a";
 
 function colorToHex(color: string) {
   const nums = color.match(/\d+/g); // extract numbers
@@ -245,7 +245,8 @@ function colorToHex(color: string) {
     "#" +
     [r, g, b]
       .map(x => Number(x).toString(16).padStart(2, "0"))
-      .join("")
+            .join("")
+            .toLowerCase()
   );
 }
 
@@ -288,7 +289,7 @@ export class ColorStegoMethod implements TextStegoMethod {
             if (element.tagName.toLowerCase() === "span" && element.style.color) {
                 const color = colorToHex(element.style.color.toLowerCase());
                 if (color) {
-                    const bit = color.includes(RGB1) ? "1" : "0";
+                    const bit = color === RGB1 ? "1" : "0";
                     for (const child of Array.from(node.childNodes)) walk(child, bit);
                     return;
                 }
